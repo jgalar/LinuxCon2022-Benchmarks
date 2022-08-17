@@ -1,0 +1,16 @@
+setup.py
+bcc/__init__.py
+bcc/containers.py
+bcc/disassembler.py
+bcc/libbcc.py
+bcc/perf.py
+bcc/syscall.py
+bcc/table.py
+bcc/tcp.py
+bcc/usdt.py
+bcc/utils.py
+bcc/version.py
+bcc.egg-info/PKG-INFO
+bcc.egg-info/SOURCES.txt
+bcc.egg-info/dependency_links.txt
+bcc.egg-info/top_level.txt

@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "lc22bench"
+version = "0.1.0"
+description = ""
+authors = ["Jérémie Galarneau <jeremie.galarneau@efficios.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+click = "^8.1.3"
+bcc = {path = "vendor/bcc-python3"}
+tabulate = "^0.8.10"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.2"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+bench = "lc22bench.bench:cli"
