@@ -15,4 +15,4 @@ include_directories(src)
 set(WORKLOAD_SOURCES src/workload.cpp src/tp.cpp)
 
 add_executable(workload ${WORKLOAD_SOURCES})
-target_link_libraries(workload -llttng-ust)
+target_link_libraries(workload LTTng::UST)

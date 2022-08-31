@@ -4,7 +4,7 @@
 # Install bcc, see https://github.com/iovisor/bcc/blob/master/INSTALL.md
 
 # Build workload
-$ mkdir build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release && make && cd ..
+$ mkdir build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=~/EfficiOS/src/LTTng-THC/usr/ && make && cd ..
 
 # Setup python virtual env with poetry
 $ poetry install
