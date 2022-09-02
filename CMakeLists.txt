@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.6.0)
 project(workload)
 
-find_package(LTTngUST)
+find_package(LTTngUST REQUIRED)
 
 set(CMAKE_CXX_FLAGS "-Wall -Wextra -pthread")
 set(CMAKE_CXX_FLAGS_DEBUG "-g3 -O0")
@@ -15,4 +15,4 @@ include_directories(src)
 set(WORKLOAD_SOURCES src/workload.cpp src/tp.cpp)
 
 add_executable(workload ${WORKLOAD_SOURCES})
-target_link_libraries(workload LTTng::UST)
+target_link_libraries(workload LTTng::UST lttng-ust-common)
