@@ -260,21 +260,15 @@ int main(int argc, const char **argv)
         }
 
         uint64_t total_count = 0;
-        std::cout << "Counter values: ";
         for (const auto thread_counter : thread_event_counters) {
-                std::cout << thread_counter << " ";
                 total_count += thread_counter;
         }
-
-        std::cout << std::endl;
 
         double total_run_time_s = 0.0;
         for (const auto thread_time_ns : thread_elapsed_time_ns) {
                 total_run_time_s += double(thread_time_ns) / double(1000000000);
         }
 
-        std::cout << std::endl;
-        std::cout << "Total iterations: " << total_count << std::endl;
         /*
          * Time per event is derived as:
          *   test_duration (seconds)
