@@ -5,6 +5,7 @@
 
 # Build workload
 $ mkdir build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release && make && cd ..
+```
 
 Personally, I typically work on development versions of LTTng that are not
 installed system-wide.
@@ -12,6 +13,7 @@ installed system-wide.
 In those cases, passing `-DCMAKE_PREFIX_PATH=~/your/custom/install/prefix/` can
 be useful.
 
+```
 # Setup python virtual env with poetry
 $ poetry install
 ```
