@@ -7,6 +7,7 @@ import logging
 import subprocess
 import random
 import psutil
+import pandas
 
 from bcc import BPF
 from bcc.utils import printb
@@ -21,20 +22,19 @@ class benchmark:
         self,
         workload_path: str,
         thread_count: int,
-        iteration_count: int,
         duration_s: int,
     ):
         self._workload_path = workload_path
         self._thread_count = thread_count
-        self._iteration_count = iteration_count
         self._duration_s = duration_s
+        self._result = None
 
     @property
     def workload_type(self) -> str:
         raise NotImplementedError
 
     def run(self) -> None:
-        subprocess.run(
+        result = subprocess.run(
             [
                 self._workload_path,
                 str(self._thread_count),
@@ -42,9 +42,18 @@ class benchmark:
                 self.workload_type,
             ],
             check=True,
-            stdout=sys.stdout,
+            stdout=subprocess.PIPE,
             stderr=sys.stderr,
         )
+
+        output = result.stdout.decode("utf-8")
+        self._result = float(output.split(" ")[0])
+
+    @property
+    def result(self) -> float:
+        if self._result is None:
+            raise AssertionError
+        return self._result
 
     def __del__(self):
         pass
@@ -55,12 +64,9 @@ class kernel_benchmark(benchmark):
         self,
         workload_path: str,
         thread_count: int,
-        iteration_count: int,
         duration_s: int,
     ):
-        benchmark.__init__(
-            self, workload_path, thread_count, iteration_count, duration_s
-        )
+        benchmark.__init__(self, workload_path, thread_count, duration_s)
 
         if os.getuid() != 0:
             click.echo(
@@ -98,12 +104,9 @@ class ebpf_map_benchmark(kernel_benchmark):
         self,
         workload_path: str,
         thread_count: int,
-        iteration_count: int,
         duration_s: int,
     ):
-        kernel_benchmark.__init__(
-            self, workload_path, thread_count, iteration_count, duration_s
-        )
+        kernel_benchmark.__init__(self, workload_path, thread_count, duration_s)
 
         src = """
         BPF_PERCPU_ARRAY(test_map, u64, 1024);
@@ -130,6 +133,8 @@ class ebpf_map_benchmark(kernel_benchmark):
         print(tabulate(table, headers=["CPU ID", "Value"]))
 
     def __del__(self):
+        self._program.detach_tracepoint(tp="lttng_bench:lttng_bench_event")
+        del self._program
         kernel_benchmark.__del__(self)
 
 
@@ -199,12 +204,9 @@ class lttng_kernel_benchmark(kernel_benchmark, lttng_benchmark):
         lttng_bin_install_path: str,
         workload_path: str,
         thread_count: int,
-        iteration_count: int,
         duration_s: int,
     ):
-        kernel_benchmark.__init__(
-            self, workload_path, thread_count, iteration_count, duration_s
-        )
+        kernel_benchmark.__init__(self, workload_path, thread_count, duration_s)
         lttng_benchmark.__init__(self, lttng_bin_install_path)
 
         # Load benchmark probe
@@ -222,7 +224,6 @@ class lttng_kernel_ringbuffer_benchmark(lttng_kernel_benchmark):
         lttng_bin_install_path: str,
         workload_path: str,
         thread_count: int,
-        iteration_count: int,
         duration_s: int,
     ):
         lttng_kernel_benchmark.__init__(
@@ -230,7 +231,6 @@ class lttng_kernel_ringbuffer_benchmark(lttng_kernel_benchmark):
             lttng_bin_install_path,
             workload_path,
             thread_count,
-            iteration_count,
             duration_s,
         )
 
@@ -263,7 +263,6 @@ class lttng_kernel_map_benchmark(lttng_kernel_benchmark):
         lttng_bin_install_path: str,
         workload_path: str,
         thread_count: int,
-        iteration_count: int,
         duration_s: int,
     ):
         lttng_kernel_benchmark.__init__(
@@ -271,7 +270,6 @@ class lttng_kernel_map_benchmark(lttng_kernel_benchmark):
             lttng_bin_install_path,
             workload_path,
             thread_count,
-            iteration_count,
             duration_s,
         )
 
@@ -314,12 +312,9 @@ class userspace_benchmark(benchmark):
         self,
         workload_path: str,
         thread_count: int,
-        iteration_count: int,
         duration_s: int,
     ):
-        benchmark.__init__(
-            self, workload_path, thread_count, iteration_count, duration_s
-        )
+        benchmark.__init__(self, workload_path, thread_count, duration_s)
 
     @property
     def workload_type(self) -> str:
@@ -335,12 +330,9 @@ class lttng_ust_benchmark(userspace_benchmark, lttng_benchmark):
         lttng_bin_install_path: str,
         workload_path: str,
         thread_count: int,
-        iteration_count: int,
         duration_s: int,
     ):
-        userspace_benchmark.__init__(
-            self, workload_path, thread_count, iteration_count, duration_s
-        )
+        userspace_benchmark.__init__(self, workload_path, thread_count, duration_s)
         lttng_benchmark.__init__(self, lttng_bin_install_path)
 
     def __del__(self):
@@ -354,7 +346,6 @@ class lttng_ust_ringbuffer_benchmark(lttng_ust_benchmark):
         lttng_bin_install_path: str,
         workload_path: str,
         thread_count: int,
-        iteration_count: int,
         duration_s: int,
     ):
         lttng_ust_benchmark.__init__(
@@ -362,7 +353,6 @@ class lttng_ust_ringbuffer_benchmark(lttng_ust_benchmark):
             lttng_bin_install_path,
             workload_path,
             thread_count,
-            iteration_count,
             duration_s,
         )
 
@@ -395,7 +385,6 @@ class lttng_ust_map_benchmark(lttng_ust_benchmark):
         lttng_bin_install_path: str,
         workload_path: str,
         thread_count: int,
-        iteration_count: int,
         duration_s: int,
     ):
         lttng_ust_benchmark.__init__(
@@ -403,7 +392,6 @@ class lttng_ust_map_benchmark(lttng_ust_benchmark):
             lttng_bin_install_path,
             workload_path,
             thread_count,
-            iteration_count,
             duration_s,
         )
 
@@ -435,6 +423,20 @@ class lttng_ust_map_benchmark(lttng_ust_benchmark):
             "remove-trigger {trigger_name}".format(trigger_name=self._trigger_name)
         )
         lttng_ust_benchmark.__del__(self)
+
+
+class benchmark_data:
+    def __init__(self):
+        self._data = []
+
+    def add(self, point: float):
+        self._data.append(point)
+
+    def summarize(self) -> None:
+        print("Time per event (ns)")
+        print("-------------------")
+        print("Points: " + str(self._data))
+        print(pandas.Series(self._data).describe())
 
 
 @click.group()
@@ -497,14 +499,21 @@ def cli(
 )
 @click.pass_context
 def run_ebpf_map_benchmark(ctx: click.Context):
-    benchmark = ebpf_map_benchmark(
-        ctx.obj["workload_path"],
-        ctx.obj["thread_count"],
-        ctx.obj["iteration_count"],
-        ctx.obj["duration_s"],
-    )
+    data = benchmark_data()
 
-    benchmark.run()
+    with click.progressbar(range(ctx.obj["iteration_count"])) as bar_wrapper:
+        for i in bar_wrapper:
+            benchmark = ebpf_map_benchmark(
+                ctx.obj["workload_path"],
+                ctx.obj["thread_count"],
+                ctx.obj["duration_s"],
+            )
+
+            benchmark.run()
+            data.add(benchmark.result)
+            del benchmark
+
+    data.summarize()
 
 
 @cli.command(
@@ -513,15 +522,22 @@ def run_ebpf_map_benchmark(ctx: click.Context):
 )
 @click.pass_context
 def run_lttng_kernel_map_benchmark(ctx: click.Context):
-    benchmark = lttng_kernel_map_benchmark(
-        ctx.obj["lttng_binary_path"],
-        ctx.obj["workload_path"],
-        ctx.obj["thread_count"],
-        ctx.obj["iteration_count"],
-        ctx.obj["duration_s"],
-    )
+    data = benchmark_data()
 
-    benchmark.run()
+    with click.progressbar(range(ctx.obj["iteration_count"])) as bar_wrapper:
+        for i in bar_wrapper:
+            benchmark = lttng_kernel_map_benchmark(
+                ctx.obj["lttng_binary_path"],
+                ctx.obj["workload_path"],
+                ctx.obj["thread_count"],
+                ctx.obj["duration_s"],
+            )
+
+            benchmark.run()
+            data.add(benchmark.result)
+            del benchmark
+
+    data.summarize()
 
 
 @cli.command(
@@ -530,15 +546,22 @@ def run_lttng_kernel_map_benchmark(ctx: click.Context):
 )
 @click.pass_context
 def run_lttng_kernel_ringbuffer_benchmark(ctx: click.Context):
-    benchmark = lttng_kernel_ringbuffer_benchmark(
-        ctx.obj["lttng_binary_path"],
-        ctx.obj["workload_path"],
-        ctx.obj["thread_count"],
-        ctx.obj["iteration_count"],
-        ctx.obj["duration_s"],
-    )
+    data = benchmark_data()
 
-    benchmark.run()
+    with click.progressbar(range(ctx.obj["iteration_count"])) as bar_wrapper:
+        for i in bar_wrapper:
+            benchmark = lttng_kernel_ringbuffer_benchmark(
+                ctx.obj["lttng_binary_path"],
+                ctx.obj["workload_path"],
+                ctx.obj["thread_count"],
+                ctx.obj["duration_s"],
+            )
+
+            benchmark.run()
+            data.add(benchmark.result)
+            del benchmark
+
+    data.summarize()
 
 
 @cli.command(
@@ -547,15 +570,21 @@ def run_lttng_kernel_ringbuffer_benchmark(ctx: click.Context):
 )
 @click.pass_context
 def run_lttng_ust_map_benchmark(ctx: click.Context):
-    benchmark = lttng_ust_map_benchmark(
-        ctx.obj["lttng_binary_path"],
-        ctx.obj["workload_path"],
-        ctx.obj["thread_count"],
-        ctx.obj["iteration_count"],
-        ctx.obj["duration_s"],
-    )
+    data = benchmark_data()
 
-    benchmark.run()
+    with click.progressbar(range(ctx.obj["iteration_count"])) as bar_wrapper:
+        for i in bar_wrapper:
+            benchmark = lttng_ust_map_benchmark(
+                ctx.obj["lttng_binary_path"],
+                ctx.obj["workload_path"],
+                ctx.obj["thread_count"],
+                ctx.obj["duration_s"],
+            )
+            benchmark.run()
+            data.add(benchmark.result)
+            del benchmark
+
+    data.summarize()
 
 
 @cli.command(
@@ -564,12 +593,19 @@ def run_lttng_ust_map_benchmark(ctx: click.Context):
 )
 @click.pass_context
 def run_lttng_ust_ringbuffer_benchmark(ctx: click.Context):
-    benchmark = lttng_ust_ringbuffer_benchmark(
-        ctx.obj["lttng_binary_path"],
-        ctx.obj["workload_path"],
-        ctx.obj["thread_count"],
-        ctx.obj["iteration_count"],
-        ctx.obj["duration_s"],
-    )
+    data = benchmark_data()
 
-    benchmark.run()
+    with click.progressbar(range(ctx.obj["iteration_count"])) as bar_wrapper:
+        for i in bar_wrapper:
+            benchmark = lttng_ust_ringbuffer_benchmark(
+                ctx.obj["lttng_binary_path"],
+                ctx.obj["workload_path"],
+                ctx.obj["thread_count"],
+                ctx.obj["duration_s"],
+            )
+
+            benchmark.run()
+            data.add(benchmark.result)
+            del benchmark
+
+    data.summarize()
