@@ -1,3 +1,12 @@
+/*
+ * Copyright (C) 2022 Jérémie Galarneau <jeremie.galarneau@efficios.com>
+ *
+ * SPDX-License-Identifier: LGPL-2.1-only
+ *
+ */
+
+#define _LGPL_SOURCE
+
 #include <iostream>
 #include <atomic>
 #include <string>
