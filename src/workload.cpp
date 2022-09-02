@@ -32,12 +32,12 @@ std::atomic<unsigned int> threads_go;
 
 int64_t timespec_delta_ns(const timespec &t1, const timespec &t2)
 {
-	timespec delta;
+        timespec delta;
 
-	delta.tv_sec = t2.tv_sec - t1.tv_sec;
-	delta.tv_nsec = t2.tv_nsec - t1.tv_nsec;
-	return ((int64_t) 1000000000 * (int64_t) delta.tv_sec) +
-			(int64_t) delta.tv_nsec;
+        delta.tv_sec = t2.tv_sec - t1.tv_sec;
+        delta.tv_nsec = t2.tv_nsec - t1.tv_nsec;
+        return ((int64_t) 1000000000 * (int64_t) delta.tv_sec) +
+                        (int64_t) delta.tv_nsec;
 }
 
 timespec sample_time()
@@ -56,49 +56,49 @@ timespec sample_time()
 /* Extracted from LTTng-ust common/smp.c */
 int _get_max_cpuid_from_sysfs(const char *path)
 {
-	long max_cpuid = -1;
+        long max_cpuid = -1;
 
-	DIR *cpudir;
-	struct dirent *entry;
+        DIR *cpudir;
+        struct dirent *entry;
 
-	assert(path);
+        assert(path);
 
-	cpudir = opendir(path);
-	if (cpudir == NULL)
-		goto end;
+        cpudir = opendir(path);
+        if (cpudir == NULL)
+                goto end;
 
-	/*
-	 * Iterate on all directories named "cpu" followed by an integer.
-	 */
-	while ((entry = readdir(cpudir))) {
-		if (entry->d_type == DT_DIR &&
-			strncmp(entry->d_name, "cpu", 3) == 0) {
+        /*
+         * Iterate on all directories named "cpu" followed by an integer.
+         */
+        while ((entry = readdir(cpudir))) {
+                if (entry->d_type == DT_DIR &&
+                        strncmp(entry->d_name, "cpu", 3) == 0) {
 
-			char *endptr;
-			long cpu_id;
+                        char *endptr;
+                        long cpu_id;
 
-			cpu_id = strtol(entry->d_name + 3, &endptr, 10);
-			if ((cpu_id < LONG_MAX) && (endptr != entry->d_name + 3)
-					&& (*endptr == '\0')) {
-				if (cpu_id > max_cpuid)
-					max_cpuid = cpu_id;
-			}
-		}
-	}
-
-	if (closedir(cpudir)) {
-		std::cerr << "Failed to close CPU directory" << std::endl;
+                        cpu_id = strtol(entry->d_name + 3, &endptr, 10);
+                        if ((cpu_id < LONG_MAX) && (endptr != entry->d_name + 3)
+                                        && (*endptr == '\0')) {
+                                if (cpu_id > max_cpuid)
+                                        max_cpuid = cpu_id;
+                        }
+                }
         }
 
-	/*
-	 * If the max CPU id is out of bound, set it to -1 so it results in a
-	 * CPU num of 0.
-	 */
-	if (max_cpuid < 0 || max_cpuid > INT_MAX)
-		max_cpuid = -1;
+        if (closedir(cpudir)) {
+                std::cerr << "Failed to close CPU directory" << std::endl;
+        }
+
+        /*
+         * If the max CPU id is out of bound, set it to -1 so it results in a
+         * CPU num of 0.
+         */
+        if (max_cpuid < 0 || max_cpuid > INT_MAX)
+                max_cpuid = -1;
 
 end:
-	return max_cpuid;
+        return max_cpuid;
 }
 
 /*
@@ -114,7 +114,7 @@ end:
  */
 int get_max_cpuid_from_sysfs(void)
 {
-	return _get_max_cpuid_from_sysfs("/sys/devices/system/cpu");
+        return _get_max_cpuid_from_sysfs("/sys/devices/system/cpu");
 }
 
 void set_current_thread_affinity(unsigned int cpu_id)
