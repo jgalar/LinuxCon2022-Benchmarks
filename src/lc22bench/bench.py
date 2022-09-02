@@ -440,9 +440,7 @@ class benchmark_data:
 @click.group()
 @click.option("-d", "--debug", is_flag=True, help="Set logging level to DEBUG")
 @click.option("-w", "--workload", help="Workload binary path", required=True)
-@click.option(
-    "--lttng-binary-path", help="LTTng binary install path", required=True, default=""
-)
+@click.option("--lttng-binary-path", help="LTTng binary install path", default="")
 @click.option(
     "--duration",
     default=10,
