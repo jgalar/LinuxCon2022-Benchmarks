@@ -11,6 +11,7 @@ from bcc import BPF
 from bcc.utils import printb
 from time import sleep
 from tabulate import tabulate
+from humanfriendly import parse_size, format_size
 
 logger = logging.getLogger(__name__)
 
@@ -231,6 +232,8 @@ class lttng_kernel_ringbuffer_benchmark(lttng_kernel_benchmark):
         workload_path: str,
         thread_count: int,
         duration_s: int,
+        num_subbuf: int,
+        subbuf_size: int,
     ):
         lttng_kernel_benchmark.__init__(
             self,
@@ -240,12 +243,18 @@ class lttng_kernel_ringbuffer_benchmark(lttng_kernel_benchmark):
             duration_s,
         )
 
+        self._num_subbuf = num_subbuf
+        self._subbuf_size = subbuf_size
+
         self._run_lttng_cmd(
             "create {session_name} --snapshot".format(session_name=self._session_name)
         )
         self._run_lttng_cmd(
-            "enable-channel --session {session_name} --kernel --subbuf-size=1M --num-subbuf=4 {channel_name}".format(
-                session_name=self._session_name, channel_name=self._channel_name
+            "enable-channel --session {session_name} --kernel --subbuf-size={subbuf_size} --num-subbuf={num_subbuf} {channel_name}".format(
+                session_name=self._session_name,
+                channel_name=self._channel_name,
+                num_subbuf=num_subbuf,
+                subbuf_size=subbuf_size,
             )
         )
         self._run_lttng_cmd(
@@ -353,6 +362,8 @@ class lttng_ust_ringbuffer_benchmark(lttng_ust_benchmark):
         workload_path: str,
         thread_count: int,
         duration_s: int,
+        num_subbuf: int,
+        subbuf_size: int,
     ):
         lttng_ust_benchmark.__init__(
             self,
@@ -362,12 +373,18 @@ class lttng_ust_ringbuffer_benchmark(lttng_ust_benchmark):
             duration_s,
         )
 
+        self._num_subbuf = num_subbuf
+        self._subbuf_size = subbuf_size
+
         self._run_lttng_cmd(
             "create {session_name} --snapshot".format(session_name=self._session_name)
         )
         self._run_lttng_cmd(
-            "enable-channel --session {session_name} --userspace --buffers-uid --subbuf-size=1M --num-subbuf=4 {channel_name}".format(
-                session_name=self._session_name, channel_name=self._channel_name
+            "enable-channel --session {session_name} --userspace --buffers-uid --subbuf-size={subbuf_size} --num-subbuf={num_subbuf} {channel_name}".format(
+                session_name=self._session_name,
+                channel_name=self._channel_name,
+                num_subbuf=num_subbuf,
+                subbuf_size=subbuf_size,
             )
         )
         self._run_lttng_cmd(
@@ -431,18 +448,20 @@ class lttng_ust_map_benchmark(lttng_ust_benchmark):
         lttng_ust_benchmark.__del__(self)
 
 
-class benchmark_data:
-    def __init__(self):
-        self._data = []
+class tracing_benchmark_results:
+    def __init__(self, name: str):
+        self._times_per_event = []
+        self._name = name
 
-    def add(self, point: float):
-        self._data.append(point)
+    def add_per_event_time(self, ns_per_event: float):
+        self._times_per_event.append(ns_per_event)
 
     def summarize(self) -> None:
-        print("Time per event (ns)")
-        print("-------------------")
-        print("Points: " + str(self._data))
-        print(pandas.Series(self._data).describe())
+        header = self._name + " - " + "Time per event (ns)"
+        print(header)
+        print("".join("-" for i in range(len(header))))
+        print("Points: " + str(self._times_per_event))
+        print(pandas.Series(self._times_per_event).describe())
 
 
 @click.group()
@@ -503,7 +522,7 @@ def cli(
 )
 @click.pass_context
 def run_ebpf_map_benchmark(ctx: click.Context):
-    data = benchmark_data()
+    results = tracing_benchmark_results("eBPF per-cpu array")
 
     with click.progressbar(range(ctx.obj["iteration_count"])) as bar_wrapper:
         for i in bar_wrapper:
@@ -514,10 +533,10 @@ def run_ebpf_map_benchmark(ctx: click.Context):
             )
 
             benchmark.run()
-            data.add(benchmark.result)
+            results.add_per_event_time(benchmark.result)
             del benchmark
 
-    data.summarize()
+    results.summarize()
 
 
 @cli.command(
@@ -526,7 +545,7 @@ def run_ebpf_map_benchmark(ctx: click.Context):
 )
 @click.pass_context
 def run_lttng_kernel_map_benchmark(ctx: click.Context):
-    data = benchmark_data()
+    results = tracing_benchmark_results("LTTng kernel map")
 
     with click.progressbar(range(ctx.obj["iteration_count"])) as bar_wrapper:
         for i in bar_wrapper:
@@ -538,19 +557,39 @@ def run_lttng_kernel_map_benchmark(ctx: click.Context):
             )
 
             benchmark.run()
-            data.add(benchmark.result)
+            results.add_per_event_time(benchmark.result)
             del benchmark
 
-    data.summarize()
+    results.summarize()
 
 
 @cli.command(
     name="lttng-kernel-ringbuffer",
     short_help="Trace to an LTTng-modules per-CPU ring-buffer and estimate the per-event overhead",
 )
+@click.option(
+    "--subbuf-size",
+    default="4K",
+    show_default=True,
+    help="Set the size of each sub-buffer to SUBBUF_SIZE bytes",
+    metavar="SUBBUF_SIZE",
+)
+@click.option(
+    "--num-subbuf",
+    default=4,
+    show_default=True,
+    help="Use SUBBUF_COUNT sub-buffers per ring buffer",
+    metavar="SUBBUF_COUNT",
+)
 @click.pass_context
-def run_lttng_kernel_ringbuffer_benchmark(ctx: click.Context):
-    data = benchmark_data()
+def run_lttng_kernel_ringbuffer_benchmark(
+    ctx: click.Context, subbuf_size: str, num_subbuf: int
+):
+    results = tracing_benchmark_results(
+        "LTTng kernel ring buffer ({num_subbuf} * {subbuf_size})".format(
+            num_subbuf=num_subbuf, subbuf_size=subbuf_size
+        )
+    )
 
     with click.progressbar(range(ctx.obj["iteration_count"])) as bar_wrapper:
         for i in bar_wrapper:
@@ -559,13 +598,15 @@ def run_lttng_kernel_ringbuffer_benchmark(ctx: click.Context):
                 ctx.obj["workload_path"],
                 ctx.obj["thread_count"],
                 ctx.obj["duration_s"],
+                num_subbuf,
+                parse_size(subbuf_size, binary=True),
             )
 
             benchmark.run()
-            data.add(benchmark.result)
+            results.add_per_event_time(benchmark.result)
             del benchmark
 
-    data.summarize()
+    results.summarize()
 
 
 @cli.command(
@@ -574,7 +615,7 @@ def run_lttng_kernel_ringbuffer_benchmark(ctx: click.Context):
 )
 @click.pass_context
 def run_lttng_ust_map_benchmark(ctx: click.Context):
-    data = benchmark_data()
+    results = tracing_benchmark_results("LTTng userspace map")
 
     with click.progressbar(range(ctx.obj["iteration_count"])) as bar_wrapper:
         for i in bar_wrapper:
@@ -585,19 +626,39 @@ def run_lttng_ust_map_benchmark(ctx: click.Context):
                 ctx.obj["duration_s"],
             )
             benchmark.run()
-            data.add(benchmark.result)
+            results.add_per_event_time(benchmark.result)
             del benchmark
 
-    data.summarize()
+    results.summarize()
 
 
 @cli.command(
     name="lttng-ust-ringbuffer",
     short_help="Trace to an LTTng-UST per-CPU ring-buffer and estimate the per-event overhead",
 )
+@click.option(
+    "--subbuf-size",
+    default="4K",
+    show_default=True,
+    help="Set the size of each sub-buffer to SUBBUF_SIZE bytes",
+    metavar="SUBBUF_SIZE",
+)
+@click.option(
+    "--num-subbuf",
+    default=4,
+    show_default=True,
+    help="Use SUBBUF_COUNT sub-buffers per ring buffer",
+    metavar="SUBBUF_COUNT",
+)
 @click.pass_context
-def run_lttng_ust_ringbuffer_benchmark(ctx: click.Context):
-    data = benchmark_data()
+def run_lttng_ust_ringbuffer_benchmark(
+    ctx: click.Context, subbuf_size: str, num_subbuf: int
+):
+    results = tracing_benchmark_results(
+        "LTTng userspace ring buffer ({num_subbuf} * {subbuf_size})".format(
+            num_subbuf=num_subbuf, subbuf_size=subbuf_size
+        )
+    )
 
     with click.progressbar(range(ctx.obj["iteration_count"])) as bar_wrapper:
         for i in bar_wrapper:
@@ -606,10 +667,12 @@ def run_lttng_ust_ringbuffer_benchmark(ctx: click.Context):
                 ctx.obj["workload_path"],
                 ctx.obj["thread_count"],
                 ctx.obj["duration_s"],
+                num_subbuf,
+                parse_size(subbuf_size, binary=True),
             )
 
             benchmark.run()
-            data.add(benchmark.result)
+            results.add_per_event_time(benchmark.result)
             del benchmark
 
-    data.summarize()
+    results.summarize()
