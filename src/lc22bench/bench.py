@@ -215,6 +215,14 @@ class lttng_kernel_benchmark(kernel_benchmark, lttng_benchmark):
         lttng_benchmark.__del__(self)
         subprocess.run("rmmod lttng-bench-tp".split(" "), check=True)
 
+        # Workaround: remove sticky modules
+        result = subprocess.run("lsmod", check=True, stdout=subprocess.PIPE)
+        lsmod_list = result.stdout.decode("utf-8")
+        for line in lsmod_list.split("\n"):
+            module_name = line.split(" ")[0]
+            if "lttng" in module_name:
+                subprocess.run(["rmmod", module_name], check=False)
+
 
 class lttng_kernel_ringbuffer_benchmark(lttng_kernel_benchmark):
     def __init__(
