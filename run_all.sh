@@ -39,10 +39,6 @@ poetry install
         echo "------------"
         lsb_release -a
         echo ""
-        echo "distro info:"
-        echo "------------"
-        lsb_release -a
-        echo ""
         echo "kernel cfg:"
         echo "-----------"
         zcat /proc/config.gz
