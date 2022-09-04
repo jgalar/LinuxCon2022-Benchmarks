@@ -16,6 +16,9 @@ poetry install
         poetry run bench --workload build/workload --duration $DURATION --iteration-count $ITER_COUNT lttng-ust-ringbuffer --num-subbuf 4 --subbuf-size 8M
         poetry run bench --workload build/workload --duration $DURATION --iteration-count $ITER_COUNT lttng-kernel-ringbuffer --num-subbuf 4 --subbuf-size 8M
 
+        # Capture as much info as possible that might influence the benchmark results.
+        # Some tools may not be available; this is really a best-effort for quick
+        # diagnostics.
         echo "Machine summary"
         echo "---------------"
         echo ""
