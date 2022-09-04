@@ -43,4 +43,8 @@ poetry install
         echo "-----------"
         zcat /proc/config.gz
         cat "/boot/config-$(uname -r)"
+        echo ""
+        echo "lshw:"
+        echo "-----------"
+        lshw
 } > results
