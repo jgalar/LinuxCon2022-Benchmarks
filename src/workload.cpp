@@ -249,8 +249,6 @@ int main(int argc, const char **argv)
 
         threads_go = 1;
 
-        // TODO change time accounting for a runtime-per-thread approach
-        // sampling the monotonic clock on begin/end of thread loops
         if (poll(nullptr, 0, duration_seconds * 1000) < 0) {
                 std::cerr << "Error returned from poll" << std::endl;
                 std::abort();
@@ -273,17 +271,17 @@ int main(int argc, const char **argv)
                 total_count += thread_counter;
         }
 
-        double total_run_time_s = 0.0;
+        double total_run_time_ns = 0.0;
         for (const auto thread_time_ns : thread_elapsed_time_ns) {
-                total_run_time_s += double(thread_time_ns) / double(1000000000);
+                total_run_time_ns += double(thread_time_ns);
         }
 
         /*
          * Time per event is derived as:
-         *   test_duration (seconds)
-         *   -----------------------  * 1,000,000,000 (ns / s) * thread_count
+         *   total_run_time_ns
+         *   ----------------------- * thread_count
          *    event_count (events)
          */
-        std::cout << ((((static_cast<double>(total_run_time_s) / static_cast<double>(total_count)) * double(1000000000)))) << " ns per event" << std::endl;
+        std::cout << ((((static_cast<double>(total_run_time_ns) / static_cast<double>(total_count))))) << " ns per event" << std::endl;
         return 0;
 }
